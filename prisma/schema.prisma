@@ -1,0 +1,301 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CREATOR
+  CUSTOMER
+  ADMIN
+}
+
+enum ProductType {
+  EBOOK
+  TEMPLATE
+  SOFTWARE
+  COURSE
+  DOWNLOADABLE_ASSET
+  SERVICE
+  MEMBERSHIP
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  name             String
+  avatarUrl        String?
+  role             Role              @default(CUSTOMER)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  workspaces       WorkspaceMember[]
+  orders           Order[]
+  reviews          Review[]
+  wishlists        Wishlist[]
+  subscriptions    Subscription[]
+}
+
+model CreatorWorkspace {
+  id            String              @id @default(uuid())
+  name          String
+  slug          String              @unique
+  ownerId       String
+  logoUrl       String?
+  customDomain  String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  members       WorkspaceMember[]
+  profiles      CreatorProfile[]
+  products      Product[]
+  courses       Course[]
+  customers     Customer[]
+  orders        Order[]
+  coupons       Coupon[]
+  memberships   Membership[]
+  newsletters   NewsletterSubscriber[]
+  campaigns     Campaign[]
+  analytics     AnalyticsEvent[]
+}
+
+model WorkspaceMember {
+  id          String           @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String           @default("MEMBER")
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model CreatorProfile {
+  id             String           @id @default(uuid())
+  workspaceId    String
+  username       String           @unique
+  name           String
+  title          String
+  bio            String
+  avatar         String
+  coverImage     String
+  location       String
+  verified       Boolean          @default(true)
+  followersCount Int              @default(0)
+  workspace      CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id               String           @id @default(uuid())
+  workspaceId      String
+  title            String
+  slug             String           @unique
+  type             ProductType
+  status           ProductStatus    @default(DRAFT)
+  category         String
+  price            Float
+  originalPrice    Float?
+  shortDescription String
+  fullDescription  String
+  coverImage       String
+  gallery          String[]
+  features         String[]
+  whatsIncluded    String[]
+  rating           Float            @default(5.0)
+  salesCount       Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  workspace        CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  variants         ProductVariant[]
+  files            ProductFile[]
+  reviews          Review[]
+  orderItems       OrderItem[]
+  wishlists        Wishlist[]
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String
+  name      String
+  price     Float
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductFile {
+  id         String   @id @default(uuid())
+  productId  String
+  filename   String
+  storageKey String
+  fileSize   Int
+  mimeType   String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductCategory {
+  id   String @id @default(uuid())
+  name String @unique
+  slug String @unique
+}
+
+model Course {
+  id          String         @id @default(uuid())
+  workspaceId String
+  title       String
+  description String
+  coverImage  String
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  modules     CourseModule[]
+}
+
+model CourseModule {
+  id       String         @id @default(uuid())
+  courseId String
+  title    String
+  course   Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons  CourseLesson[]
+}
+
+model CourseLesson {
+  id       String       @id @default(uuid())
+  moduleId String
+  title    String
+  duration String
+  videoUrl String?
+  module   CourseModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+}
+
+model Customer {
+  id          String           @id @default(uuid())
+  workspaceId String
+  name        String
+  email       String
+  totalSpend  Float            @default(0)
+  ordersCount Int              @default(0)
+  segment     String           @default("New Customer")
+  createdAt   DateTime         @default(now())
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id            String           @id @default(uuid())
+  workspaceId   String
+  userId        String?
+  customerName  String
+  customerEmail String
+  subtotal      Float
+  discount      Float
+  tax           Float
+  total         Float
+  status        OrderStatus      @default(PENDING)
+  createdAt     DateTime         @default(now())
+  workspace     CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user          User?            @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  payments      Payment[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  price     Float
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  orderId       String
+  provider      String   @default("MOCK_PAYMENT_PROVIDER")
+  transactionId String   @unique
+  amount        Float
+  status        String
+  createdAt     DateTime @default(now())
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model Coupon {
+  id            String           @id @default(uuid())
+  workspaceId   String
+  code          String           @unique
+  discountPct   Float
+  active        Boolean          @default(true)
+  workspace     CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  productId String
+  userId    String
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Wishlist {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  userId    String
+  plan      String
+  status    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Membership {
+  id          String           @id @default(uuid())
+  workspaceId String
+  title       String
+  monthlyPrice Float
+  perks       String[]
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model NewsletterSubscriber {
+  id          String           @id @default(uuid())
+  workspaceId String
+  email       String
+  createdAt   DateTime         @default(now())
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model Campaign {
+  id          String           @id @default(uuid())
+  workspaceId String
+  subject     String
+  sentCount   Int              @default(0)
+  sentAt      DateTime         @default(now())
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model AnalyticsEvent {
+  id          String           @id @default(uuid())
+  workspaceId String
+  eventType   String
+  metadata    String?
+  createdAt   DateTime         @default(now())
+  workspace   CreatorWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}

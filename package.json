@@ -1,0 +1,12 @@
+{
+  "name": "creatorhub-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "node --test tests/api.test.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
